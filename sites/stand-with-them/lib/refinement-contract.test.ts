@@ -67,6 +67,18 @@ describe("public refinement contract", () => {
     expect(source("components/admin/verification-code-button.tsx")).toContain("Reveal code");
   });
 
+  it("reveals encrypted gift card codes only on demand to payment reviewers", () => {
+    const route = source("app/api/admin/payments/[paymentId]/gift-card-code/route.ts");
+    const button = source("components/admin/gift-card-code-button.tsx");
+    const paymentTable = source("components/admin/payment-review-table.tsx");
+    expect(route).toContain('authorizeAdmin("review_payments")');
+    expect(route).toContain("decryptSensitiveValue");
+    expect(route).toContain('action: "gift_card_code.revealed"');
+    expect(route).toContain('"cache-control": "private, no-store"');
+    expect(button).toContain("Reveal gift card code");
+    expect(paymentTable).toContain("<GiftCardCodeButton paymentId={payment.id} />");
+  });
+
   it("publishes editable email and phone contact channels", () => {
     const contactPage = source("app/contact/page.tsx");
     const footer = source("components/site-footer.tsx");
@@ -136,6 +148,7 @@ describe("administrator protection contract", () => {
       "app/api/admin/payment-options/route.ts",
       "app/api/admin/payment-options/[optionId]/route.ts",
       "app/api/admin/payments/[paymentId]/route.ts",
+      "app/api/admin/payments/[paymentId]/gift-card-code/route.ts",
       "app/api/admin/receipts/[receiptId]/verification-code/route.ts",
       "app/api/admin/settings/route.ts",
       "app/api/admin/settings/contact/route.ts",

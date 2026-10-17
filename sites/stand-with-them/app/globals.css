@@ -331,6 +331,13 @@ h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; letter-spacing: -.0
 .admin-verification-code { display: flex; align-items: center; gap: .4rem; }
 .admin-verification-code code { font-size: .7rem; font-weight: 800; letter-spacing: .035em; white-space: nowrap; }
 .admin-verification-code .icon-button { width: 32px; height: 32px; }
+.payment-evidence-actions { display: grid; gap: .55rem; min-width: 10.5rem; }
+.payment-evidence-actions > .table-button { display: inline-flex; align-items: center; gap: .3rem; width: fit-content; }
+.admin-gift-card-code { display: grid; gap: .3rem; }
+.admin-gift-card-code > span { color: var(--muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.admin-gift-card-code > div { display: flex; align-items: center; gap: .35rem; }
+.admin-gift-card-code code { max-width: 12rem; overflow-wrap: anywhere; font-size: .72rem; font-weight: 800; }
+.admin-gift-card-code .icon-button { width: 32px; height: 32px; flex: 0 0 auto; }
 .admin-legacy-code { display: grid; gap: .35rem; min-width: 12rem; }
 .admin-legacy-code input { min-height: 34px; border: 1px solid #aeb9ba; padding: .35rem .45rem; font: 700 .68rem ui-monospace, monospace; text-transform: uppercase; }
 .admin-legacy-code .table-button { width: fit-content; }
