@@ -2,6 +2,7 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { requireAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
+export const metadata = { robots: { index: false, follow: false } };
 
 export default async function ProtectedAdminLayout({ children }: { children: React.ReactNode }) {
   const admin = await requireAdmin();

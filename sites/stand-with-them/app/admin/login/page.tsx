@@ -4,7 +4,7 @@ import { getCurrentAdmin } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Administrator Sign In" };
+export const metadata = { title: "Administrator Sign In", robots: { index: false, follow: false } };
 
 export default async function AdminLoginPage() {
   if (await getCurrentAdmin()) redirect("/admin");

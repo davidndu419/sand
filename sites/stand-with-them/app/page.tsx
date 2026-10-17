@@ -33,7 +33,7 @@ export default async function Home() {
             <div className="hero-assurances">
               <span><ShieldCheck size={17} /> Admin-issued tags only</span>
               <span><ClipboardCheck size={17} /> Manual payment review</span>
-              <span><Eye size={17} /> Track recorded progress</span>
+              <span><Eye size={17} /> Track progress by receipt</span>
             </div>
           </div>
           <figure className="hero-visual">
@@ -90,8 +90,8 @@ export default async function Home() {
           <div className="transparency-copy">
             <p className="eyebrow dark"><span /> TRANSPARENCY WITHOUT EXPOSURE</p>
             <h2>Clear records. Protected people.</h2>
-            <p>Public pages show only the fields needed to verify a receipt or follow a donation. Donor contacts, soldier identity, mobile numbers, payment evidence, redemption credentials, and internal notes remain restricted.</p>
-            <Link href="/verify-receipt" className="button button-navy">Verify a receipt <ArrowRight size={18} /></Link>
+            <p>Track Receipt shows the current payment and fulfilment status using one verification code. Donor contacts, soldier identity, mobile numbers, payment evidence, redemption credentials, and internal notes remain restricted.</p>
+            <Link href="/verify-receipt" className="button button-navy">Track a receipt <ArrowRight size={18} /></Link>
           </div>
           <div className="transparency-panel">
             {metrics ? (
@@ -112,7 +112,7 @@ export default async function Home() {
       </section>
 
       <section className="final-cta">
-        <div className="shell final-cta-inner"><div><p className="eyebrow light"><span /> A PRACTICAL ACT OF SUPPORT</p><h2>Your Support Can Make a Difference.</h2></div><Link href="/donate" className="button button-gold">Donate now <ArrowRight size={18} /></Link></div>
+        <div className="shell final-cta-inner"><div><p className="eyebrow light"><span /> A PRACTICAL ACT OF SUPPORT</p><h2>Your Support Can Make a Difference.</h2></div><div className="button-row"><Link href="/contact" className="button button-ghost">Contact support</Link><Link href="/donate" className="button button-gold">Donate now <ArrowRight size={18} /></Link></div></div>
       </section>
     </main>
   );

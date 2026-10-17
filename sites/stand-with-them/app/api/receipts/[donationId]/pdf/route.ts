@@ -11,11 +11,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ dona
     const { donationId } = await params;
     const code = new URL(request.url).searchParams.get("code")?.trim().toUpperCase();
     if (!code) return new Response("Verification code required.", { status: 400 });
-    const { data, error } = await createServiceClient().rpc("public_get_receipt", {
+    const service = createServiceClient();
+    const { data, error } = await service.rpc("public_get_receipt", {
       p_donation_id: donationId,
       p_verification_code: code,
     });
     if (error || !data) return new Response("Receipt not found.", { status: 404 });
+    let fulfilmentStatus = data.fulfilment_status as string | undefined;
+    if (!fulfilmentStatus) {
+      const { data: donation, error: donationError } = await service.from("donations").select("fulfilment_status").eq("id", donationId).maybeSingle();
+      if (donationError || !donation) throw donationError || new Error("Receipt status unavailable.");
+      fulfilmentStatus = donation.fulfilment_status;
+    }
+    if (!fulfilmentStatus) throw new Error("Receipt status unavailable.");
     const pdf = await PDFDocument.create();
     const page = pdf.addPage([595, 842]);
     const regular = await pdf.embedFont(StandardFonts.Helvetica);
@@ -24,16 +32,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ dona
     page.drawText("STAND WITH THEM", { x: 42, y: 802, size: 20, font: bold, color: rgb(1, 1, 1) });
     page.drawText("DONATION SUBMISSION RECEIPT", { x: 42, y: 746, size: 11, font: bold, color: rgb(0.73, 0.55, 0.18) });
     const rows: Array<[string, string]> = [
-      ["Receipt number", data.receipt_number],
-      ["Donation reference", data.donation_reference],
+      ["Verification code", code],
       ["Date recorded", new Date(data.donation_date).toLocaleString("en-GB", { timeZone: "UTC" }) + " UTC"],
       ["Beneficiary tag", data.soldier_tag || "General soldier support"],
       ["Support category", data.category_name],
       ["Amount", formatMoney(data.amount_minor, data.currency)],
       ["Payment method", String(data.payment_method).replace("_", " ")],
       ["Payment status", String(data.payment_status).toUpperCase()],
-      ["Verification code", code],
     ];
+    if (data.soldier_tag) rows.push(["Fulfilment status", fulfilmentStatus.replaceAll("_", " ").toUpperCase()]);
     let y = 700;
     for (const [label, value] of rows) {
       page.drawText(label, { x: 42, y, size: 9, font: bold, color: rgb(0.25, 0.3, 0.33) });
@@ -54,7 +61,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ dona
     return new Response(bytes as BodyInit, {
       headers: {
         "content-type": "application/pdf",
-        "content-disposition": `attachment; filename="${data.receipt_number}.pdf"`,
+        "content-disposition": 'attachment; filename="stand-with-them-receipt.pdf"',
         "cache-control": "private, no-store",
       },
     });

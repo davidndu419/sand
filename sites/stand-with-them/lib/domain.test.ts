@@ -4,10 +4,11 @@ import {
   canTransitionPayment,
   decryptSensitiveValue,
   encryptSensitiveValue,
+  formatStatusLabel,
   generateSoldierTag,
   roleCan,
 } from "@/lib/domain";
-import { fulfilmentSchema, paymentSchema, reviewPaymentSchema, soldierTagSchema, startDonationSchema } from "@/lib/validation";
+import { fulfilmentSchema, paymentSchema, publicContactSchema, reviewPaymentSchema, soldierTagSchema, startDonationSchema } from "@/lib/validation";
 
 beforeAll(() => {
   const bytes = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
@@ -41,6 +42,12 @@ describe("state machines", () => {
     expect(canTransitionFulfilment("purchase_in_progress", "delivered")).toBe(true);
     expect(canTransitionFulfilment("delivered", "awaiting_delivery")).toBe(false);
   });
+
+  it("presents payment and fulfilment states with distinct readable labels", () => {
+    expect(formatStatusLabel("pending")).toBe("Pending Verification");
+    expect(formatStatusLabel("awaiting_payment_confirmation")).toBe("Awaiting Payment Confirmation");
+    expect(formatStatusLabel("purchase_in_progress")).toBe("Purchase in Progress");
+  });
 });
 
 describe("roles and sensitive values", () => {
@@ -66,9 +73,9 @@ describe("donation validation", () => {
     expect(startDonationSchema.safeParse({ kind: "general", categorySlug: "general-support", amountMinor: 5000, currency: "USD" }).success).toBe(true);
   });
 
-  it("requires the appropriate manual-payment evidence fields", () => {
+  it("requires gift-card credentials but not a cryptocurrency transaction hash", () => {
     expect(paymentSchema.safeParse({ accessCode: "A".repeat(36), method: "gift_card", paymentOptionId: crypto.randomUUID() }).success).toBe(false);
-    expect(paymentSchema.safeParse({ accessCode: "A".repeat(36), method: "cryptocurrency", paymentOptionId: crypto.randomUUID(), transactionHash: "0x1234567890abcdef" }).success).toBe(true);
+    expect(paymentSchema.safeParse({ accessCode: "A".repeat(36), method: "cryptocurrency", paymentOptionId: crypto.randomUUID() }).success).toBe(true);
   });
 
   it("rejects non-integer, too-small, and excessive donation amounts", () => {
@@ -91,9 +98,8 @@ describe("donation validation", () => {
     expect(reviewPaymentSchema.safeParse({ status: "confirmed" }).success).toBe(true);
   });
 
-  it("rejects malformed transaction hashes and gift-card codes", () => {
+  it("rejects malformed gift-card codes", () => {
     const paymentOptionId = crypto.randomUUID();
-    expect(paymentSchema.safeParse({ accessCode: "A".repeat(36), method: "cryptocurrency", paymentOptionId, transactionHash: "short" }).success).toBe(false);
     expect(paymentSchema.safeParse({ accessCode: "A".repeat(36), method: "gift_card", paymentOptionId, giftCardCode: "123" }).success).toBe(false);
   });
 
@@ -102,5 +108,19 @@ describe("donation validation", () => {
     expect(fulfilmentSchema.safeParse({ donationId, action: "allocate", amountMinor: 0 }).success).toBe(false);
     expect(fulfilmentSchema.safeParse({ donationId, action: "allocate", amountMinor: 2500, note: "Approved allocation" }).success).toBe(true);
     expect(fulfilmentSchema.safeParse({ donationId, action: "status", status: "delivered", note: "x".repeat(2001) }).success).toBe(false);
+  });
+});
+
+describe("public contact validation", () => {
+  it("accepts an email, a phone number, or both", () => {
+    expect(publicContactSchema.safeParse({ email: "support@example.org", phone: "" }).success).toBe(true);
+    expect(publicContactSchema.safeParse({ email: "", phone: "+234 800 000 0000" }).success).toBe(true);
+    expect(publicContactSchema.safeParse({ email: "support@example.org", phone: "+234 800 000 0000" }).success).toBe(true);
+  });
+
+  it("rejects empty or malformed contact details", () => {
+    expect(publicContactSchema.safeParse({ email: "", phone: "" }).success).toBe(false);
+    expect(publicContactSchema.safeParse({ email: "not-an-email", phone: "" }).success).toBe(false);
+    expect(publicContactSchema.safeParse({ email: "", phone: "call-me" }).success).toBe(false);
   });
 });

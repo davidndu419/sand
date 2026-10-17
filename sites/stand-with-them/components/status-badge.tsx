@@ -1,5 +1,7 @@
+import { formatStatusLabel } from "@/lib/domain";
+
 export function StatusBadge({ value }: { value: string }) {
   const normalized = value.toLowerCase();
-  const tone = normalized.includes("confirm") || normalized === "delivered" ? "success" : normalized.includes("declin") || normalized.includes("unable") || normalized === "cancelled" ? "danger" : "pending";
-  return <span className={`status-badge status-${tone}`}>{value.replaceAll("_", " ")}</span>;
+  const tone = normalized === "confirmed" || normalized === "delivered" ? "success" : normalized === "declined" || normalized === "unable_to_fulfil" || normalized === "cancelled" ? "danger" : "pending";
+  return <span className={`status-badge status-${tone}`}>{formatStatusLabel(value)}</span>;
 }

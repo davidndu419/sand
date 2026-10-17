@@ -121,9 +121,9 @@ create table if not exists public.payment_submissions (
   reviewed_at timestamptz,
   review_notes text check (review_notes is null or char_length(review_notes) <= 2000),
   decline_reason text check (decline_reason is null or char_length(decline_reason) <= 500),
-  check (
+  constraint payment_submissions_method_fields_check check (
     (method = 'gift_card' and gift_card_code_ciphertext is not null and transaction_hash is null)
-    or (method = 'cryptocurrency' and transaction_hash is not null and gift_card_code_ciphertext is null)
+    or (method = 'cryptocurrency' and gift_card_code_ciphertext is null)
   ),
   check ((status = 'pending' and reviewed_by is null and reviewed_at is null)
     or (status <> 'pending' and reviewed_by is not null and reviewed_at is not null)),
@@ -146,6 +146,7 @@ create table if not exists public.receipts (
   donation_id uuid not null unique references public.donations(id) on delete restrict,
   receipt_number text not null unique check (receipt_number ~ '^STW-[0-9]{4}-[0-9]{6,}$'),
   verification_code_hash bytea not null unique,
+  verification_code_ciphertext text check (verification_code_ciphertext is null or char_length(verification_code_ciphertext) between 20 and 1000),
   generated_at timestamptz not null default now()
 );
 
@@ -313,8 +314,10 @@ begin
   ) then raise exception 'invalid_categories'; end if;
   loop
     v_attempt := v_attempt + 1;
-    v_tag := 'SLD-' || upper(substr(translate(encode(gen_random_bytes(8),'base64'), '/+=01IO', 'ABCDEFG'),1,8));
-    v_tag := regexp_replace(v_tag, '[^A-HJ-NP-Z2-9]', 'K', 'g');
+    v_tag := 'SLD-' || regexp_replace(
+      upper(substr(translate(encode(gen_random_bytes(8),'base64'), '/+=01IO', 'ABCDEFG'),1,8)),
+      '[^A-HJ-NP-Z2-9]', 'K', 'g'
+    );
     exit when not exists(select 1 from public.soldiers where tag = v_tag);
     if v_attempt > 10 then raise exception 'tag_generation_failed'; end if;
   end loop;
@@ -363,8 +366,10 @@ begin
   end if;
   v_access := upper(encode(gen_random_bytes(18),'hex'));
   v_reference := 'DON-' || to_char(now() at time zone 'UTC','YYYYMMDD') || '-' ||
-    upper(substr(translate(encode(gen_random_bytes(8),'base64'), '/+=01IO', 'ABCDEFG'),1,8));
-  v_reference := regexp_replace(v_reference, '[^A-Z0-9-]', 'K', 'g');
+    regexp_replace(
+      upper(substr(encode(gen_random_bytes(8),'base64'),1,8)),
+      '[^A-HJ-NP-Z2-9]', 'K', 'g'
+    );
   insert into public.donations(reference,kind,soldier_id,soldier_tag_snapshot,category_id,
     amount_minor,currency,donor_name,donor_email,access_code_hash)
   values(v_reference,v_kind,case when v_kind='soldier' then v_soldier.id end,
@@ -397,7 +402,8 @@ end; $$;
 create or replace function public.submit_payment(
   p_donation_id uuid, p_access_code text, p_method text, p_payment_option_id uuid,
   p_gift_code_ciphertext text, p_transaction_hash text,
-  p_evidence_path text, p_evidence_name text, p_evidence_mime text, p_evidence_size bigint
+  p_evidence_path text, p_evidence_name text, p_evidence_mime text, p_evidence_size bigint,
+  p_verification_code text, p_verification_code_ciphertext text
 ) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare v_donation public.donations; v_option public.payment_options; v_payment_id uuid;
@@ -410,7 +416,9 @@ begin
   select * into v_option from public.payment_options where id=p_payment_option_id and active and method=p_method::public.payment_method;
   if not found then raise exception 'payment_option_unavailable'; end if;
   if p_method='gift_card' and nullif(p_gift_code_ciphertext,'') is null then raise exception 'gift_code_required'; end if;
-  if p_method='cryptocurrency' and nullif(p_transaction_hash,'') is null then raise exception 'transaction_hash_required'; end if;
+  v_verification := upper(trim(p_verification_code));
+  if v_verification is null or v_verification !~ '^[A-HJ-NP-Z2-9]{20}$'
+    or nullif(trim(p_verification_code_ciphertext),'') is null then raise exception 'verification_code_required'; end if;
   insert into public.payment_submissions(donation_id,method,payment_option_id,gift_card_code_ciphertext,transaction_hash)
   values(p_donation_id,p_method::public.payment_method,p_payment_option_id,
     case when p_method='gift_card' then p_gift_code_ciphertext end,
@@ -421,22 +429,22 @@ begin
     values(v_payment_id,p_evidence_path,p_evidence_name,p_evidence_mime,p_evidence_size);
   end if;
   v_receipt := 'STW-' || to_char(now() at time zone 'UTC','YYYY') || '-' || lpad(nextval('public.receipt_number_seq')::text,6,'0');
-  v_verification := upper(encode(gen_random_bytes(16),'hex'));
-  insert into public.receipts(donation_id,receipt_number,verification_code_hash)
-  values(p_donation_id,v_receipt,digest(v_verification,'sha256'));
+  insert into public.receipts(donation_id,receipt_number,verification_code_hash,verification_code_ciphertext)
+  values(p_donation_id,v_receipt,digest(v_verification,'sha256'),trim(p_verification_code_ciphertext));
   insert into public.fulfilment_events(donation_id,event_type,public_description)
   values(p_donation_id,'payment_submitted','Payment evidence was submitted and is awaiting administrative verification.');
-  return jsonb_build_object('donationId',p_donation_id,'reference',v_donation.reference,
-    'receiptNumber',v_receipt,'verificationCode',v_verification,'accessCode',p_access_code);
+  return jsonb_build_object('donationId',p_donation_id,'verificationCode',v_verification);
 end; $$;
 
 create or replace function public.public_verify_receipt(p_verification_code text)
 returns jsonb language sql security definer set search_path = public, extensions as $$
   select jsonb_build_object(
-    'donation_id',d.id,'receipt_number',r.receipt_number,'donation_reference',d.reference,
     'donation_date',d.created_at,'soldier_tag',d.soldier_tag_snapshot,'category_name',c.name,
     'amount_minor',d.amount_minor,'currency',d.currency,'payment_method',ps.method,
-    'payment_status',ps.status,'generated_at',r.generated_at
+    'payment_status',ps.status,'fulfilment_status',d.fulfilment_status,'generated_at',r.generated_at,
+    'events',coalesce((select jsonb_agg(jsonb_build_object(
+      'description',e.public_description,'at',e.event_at
+    ) order by e.event_at) from public.fulfilment_events e where e.donation_id=d.id),'[]'::jsonb)
   ) from public.receipts r join public.donations d on d.id=r.donation_id
   join public.support_categories c on c.id=d.category_id
   join public.payment_submissions ps on ps.donation_id=d.id
@@ -446,30 +454,36 @@ $$;
 create or replace function public.public_get_receipt(p_donation_id uuid, p_verification_code text)
 returns jsonb language sql security definer set search_path = public, extensions as $$
   select jsonb_build_object(
-    'donation_id',d.id,'receipt_number',r.receipt_number,'donation_reference',d.reference,
     'donation_date',d.created_at,'soldier_tag',d.soldier_tag_snapshot,'category_name',c.name,
     'amount_minor',d.amount_minor,'currency',d.currency,'payment_method',ps.method,
-    'payment_status',ps.status,'generated_at',r.generated_at
+    'payment_status',ps.status,'fulfilment_status',d.fulfilment_status,'generated_at',r.generated_at
   ) from public.donations d join public.receipts r on r.donation_id=d.id
   join public.support_categories c on c.id=d.category_id
   join public.payment_submissions ps on ps.donation_id=d.id
   where d.id=p_donation_id and r.verification_code_hash=digest(upper(trim(p_verification_code)),'sha256');
 $$;
 
-create or replace function public.public_track_donation(p_reference text, p_access_code text)
-returns jsonb language plpgsql security definer set search_path = public, extensions as $$
-declare v_result jsonb;
+create or replace function public.link_receipt_verification_code(
+  p_admin_id uuid, p_receipt_id uuid, p_verification_code text, p_verification_code_ciphertext text
+) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_role public.admin_role; v_code text; v_updated uuid;
 begin
-  select jsonb_build_object(
-    'reference',d.reference,'soldierTag',d.soldier_tag_snapshot,'categoryName',c.name,
-    'amountMinor',d.amount_minor,'currency',d.currency,'paymentStatus',d.payment_status,
-    'fulfilmentStatus',d.fulfilment_status,'createdAt',d.created_at,
-    'events',coalesce((select jsonb_agg(jsonb_build_object('type',e.event_type,
-      'description',e.public_description,'at',e.event_at) order by e.event_at)
-      from public.fulfilment_events e where e.donation_id=d.id),'[]'::jsonb)
-  ) into v_result from public.donations d join public.support_categories c on c.id=d.category_id
-  where d.reference=upper(trim(p_reference)) and d.access_code_hash=digest(upper(trim(p_access_code)),'sha256');
-  return v_result;
+  select role into v_role from public.admin_profiles where id=p_admin_id and active;
+  if v_role is null then raise exception 'forbidden'; end if;
+  v_code := upper(trim(p_verification_code));
+  if v_code is null or v_code !~ '^([A-HJ-NP-Z2-9]{20}|[A-F0-9]{32})$'
+    or nullif(trim(p_verification_code_ciphertext),'') is null then raise exception 'invalid_code'; end if;
+  if exists(select 1 from public.receipts where id=p_receipt_id and verification_code_ciphertext is not null)
+    then raise exception 'already_linked'; end if;
+  update public.receipts set verification_code_ciphertext=trim(p_verification_code_ciphertext)
+  where id=p_receipt_id and verification_code_ciphertext is null
+    and verification_code_hash=digest(v_code,'sha256')
+  returning id into v_updated;
+  if v_updated is null then raise exception 'invalid_code'; end if;
+  insert into public.audit_logs(actor_id,action,entity_type,entity_id,metadata)
+  values(p_admin_id,'receipt.verification_code_linked','receipt',p_receipt_id::text,jsonb_build_object('legacy',true));
+  return true;
 end; $$;
 
 create or replace function public.review_payment(
@@ -648,6 +662,30 @@ begin
   return true;
 end; $$;
 
+create or replace function public.update_public_contact(
+  p_admin_id uuid, p_email text, p_phone text
+) returns boolean language plpgsql security definer set search_path = public as $$
+declare v_role public.admin_role; v_email text; v_phone text;
+begin
+  select role into v_role from public.admin_profiles where id=p_admin_id and active;
+  if v_role is null or v_role <> 'super_administrator' then raise exception 'forbidden'; end if;
+  v_email := lower(nullif(trim(p_email),''));
+  v_phone := nullif(trim(p_phone),'');
+  if v_email is null and v_phone is null then raise exception 'contact_required'; end if;
+  if v_email is not null and (char_length(v_email) > 254 or v_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$')
+    then raise exception 'invalid_email'; end if;
+  if v_phone is not null and (char_length(v_phone) > 40 or v_phone !~ '^[+()0-9. -]{6,40}$')
+    then raise exception 'invalid_phone'; end if;
+  insert into public.app_settings(key,value,public,updated_by) values
+    ('contact.email',coalesce(to_jsonb(v_email),'null'::jsonb),true,p_admin_id),
+    ('contact.phone',coalesce(to_jsonb(v_phone),'null'::jsonb),true,p_admin_id)
+  on conflict(key) do update set value=excluded.value,public=true,updated_by=p_admin_id,updated_at=now();
+  insert into public.audit_logs(actor_id,action,entity_type,entity_id,metadata)
+  values(p_admin_id,'contact.updated','app_setting','contact',jsonb_build_object(
+    'email_configured',v_email is not null,'phone_configured',v_phone is not null));
+  return true;
+end; $$;
+
 -- No browser receives direct table access. Authenticated administrators use server routes,
 -- which re-check their active profile and role before service-role operations.
 alter table public.admin_profiles enable row level security;
@@ -677,16 +715,17 @@ revoke all on function public.register_soldier(uuid,text,text,text,uuid[]) from 
 revoke all on function public.validate_soldier_tag(text,text) from public;
 revoke all on function public.create_donation_draft(text,text,text,bigint,text,text,text) from public;
 revoke all on function public.get_donation_payment_context(uuid,text) from public;
-revoke all on function public.submit_payment(uuid,text,text,uuid,text,text,text,text,text,bigint) from public;
+revoke all on function public.submit_payment(uuid,text,text,uuid,text,text,text,text,text,bigint,text,text) from public;
 revoke all on function public.public_verify_receipt(text) from public;
 revoke all on function public.public_get_receipt(uuid,text) from public;
-revoke all on function public.public_track_donation(text,text) from public;
+revoke all on function public.link_receipt_verification_code(uuid,uuid,text,text) from public;
 revoke all on function public.review_payment(uuid,uuid,text,text,text) from public;
 revoke all on function public.set_soldier_status(uuid,uuid,text) from public;
 revoke all on function public.record_fund_allocation(uuid,uuid,bigint,text) from public;
 revoke all on function public.record_purchase(uuid,uuid,jsonb,bigint,text,text) from public;
 revoke all on function public.set_fulfilment_status(uuid,uuid,text,text) from public;
 revoke all on function public.update_app_setting(uuid,text,jsonb,boolean) from public;
+revoke all on function public.update_public_contact(uuid,text,text) from public;
 revoke all on function public.record_general_fund_transaction(uuid,uuid,text,bigint,text) from public;
 
 grant execute on function public.consume_public_rate_limit(text,text,integer,integer) to service_role;
@@ -694,16 +733,17 @@ grant execute on function public.register_soldier(uuid,text,text,text,uuid[]) to
 grant execute on function public.validate_soldier_tag(text,text) to service_role;
 grant execute on function public.create_donation_draft(text,text,text,bigint,text,text,text) to service_role;
 grant execute on function public.get_donation_payment_context(uuid,text) to service_role;
-grant execute on function public.submit_payment(uuid,text,text,uuid,text,text,text,text,text,bigint) to service_role;
+grant execute on function public.submit_payment(uuid,text,text,uuid,text,text,text,text,text,bigint,text,text) to service_role;
 grant execute on function public.public_verify_receipt(text) to service_role;
 grant execute on function public.public_get_receipt(uuid,text) to service_role;
-grant execute on function public.public_track_donation(text,text) to service_role;
+grant execute on function public.link_receipt_verification_code(uuid,uuid,text,text) to service_role;
 grant execute on function public.review_payment(uuid,uuid,text,text,text) to service_role;
 grant execute on function public.set_soldier_status(uuid,uuid,text) to service_role;
 grant execute on function public.record_fund_allocation(uuid,uuid,bigint,text) to service_role;
 grant execute on function public.record_purchase(uuid,uuid,jsonb,bigint,text,text) to service_role;
 grant execute on function public.set_fulfilment_status(uuid,uuid,text,text) to service_role;
 grant execute on function public.update_app_setting(uuid,text,jsonb,boolean) to service_role;
+grant execute on function public.update_public_contact(uuid,text,text) to service_role;
 grant execute on function public.record_general_fund_transaction(uuid,uuid,text,bigint,text) to service_role;
 
 insert into public.support_categories(slug,name,description,icon,allows_soldier,allows_general,sort_order,suggested_amounts_minor)
@@ -723,6 +763,7 @@ insert into public.app_settings(key,value,public) values
  ('donation.currency','"USD"'::jsonb,true),
  ('donation.minimum_minor','100'::jsonb,false),
  ('contact.email','null'::jsonb,true),
+ ('contact.phone','null'::jsonb,true),
  ('content.mission','"We coordinate practical support for verified beneficiaries while preserving privacy, documenting payment review, and recording fulfilment decisions."'::jsonb,true)
 on conflict(key) do nothing;
 

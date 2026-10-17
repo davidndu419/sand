@@ -24,6 +24,26 @@ export function formatMoney(amountMinor: number, currency = "USD") {
   }).format(amountMinor / 100);
 }
 
+const statusLabels: Record<string, string> = {
+  pending: "Pending Verification",
+  confirmed: "Confirmed",
+  declined: "Declined",
+  awaiting_payment_confirmation: "Awaiting Payment Confirmation",
+  awaiting_allocation: "Awaiting Allocation",
+  funds_allocated: "Funds Allocated",
+  purchase_in_progress: "Purchase in Progress",
+  awaiting_delivery: "Awaiting Delivery",
+  delivered: "Delivered",
+  unable_to_fulfil: "Unable to Fulfil",
+  cancelled: "Cancelled",
+};
+
+export function formatStatusLabel(value: string) {
+  return statusLabels[value.toLowerCase()] ?? value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 export const paymentTransitions: Record<PaymentStatus, PaymentStatus[]> = {
   pending: ["confirmed", "declined"],
   confirmed: [],

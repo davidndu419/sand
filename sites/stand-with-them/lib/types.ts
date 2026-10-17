@@ -34,9 +34,6 @@ export type PublicCategory = {
 };
 
 export type ReceiptView = {
-  donation_id: string;
-  receipt_number: string;
-  donation_reference: string;
   donation_date: string;
   soldier_tag: string | null;
   category_name: string;
@@ -44,4 +41,5 @@ export type ReceiptView = {
   currency: string;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
+  fulfilment_status: FulfilmentStatus;
 };

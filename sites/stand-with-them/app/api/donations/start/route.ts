@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     }
     const input = parsed.data;
     const service = createServiceClient();
-    const { data, error } = await service.rpc("create_donation_draft", {
+    const rpcArguments = {
       p_kind: input.kind,
       p_soldier_tag: input.soldierTag ? normalizeSoldierTag(input.soldierTag) : null,
       p_category_slug: input.categorySlug,
@@ -27,7 +27,18 @@ export async function POST(request: Request) {
       p_currency: input.currency,
       p_donor_name: input.donorName || null,
       p_donor_email: input.donorEmail || null,
-    });
+    };
+    let result = await service.rpc("create_donation_draft", rpcArguments);
+    for (
+      let attempt = 1;
+      attempt < 5 &&
+        result.error?.code === "23514" &&
+        result.error.message.includes("donations_reference_check");
+      attempt += 1
+    ) {
+      result = await service.rpc("create_donation_draft", rpcArguments);
+    }
+    const { data, error } = result;
     if (error) {
       if (error.message.includes("tag_unavailable")) {
         return NextResponse.json({ error: "That soldier tag is inactive, ineligible, or unavailable." }, { status: 400 });

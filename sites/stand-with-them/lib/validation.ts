@@ -32,11 +32,6 @@ export const paymentSchema = z
     method: z.enum(["gift_card", "cryptocurrency"]),
     paymentOptionId: z.string().uuid(),
     giftCardCode: z.string().trim().min(6).max(500).optional(),
-    transactionHash: z
-      .string()
-      .trim()
-      .regex(/^[a-zA-Z0-9:_-]{12,160}$/)
-      .optional(),
   })
   .superRefine((value, context) => {
     if (value.method === "gift_card" && !value.giftCardCode) {
@@ -46,18 +41,24 @@ export const paymentSchema = z
         message: "Enter the gift card code.",
       });
     }
-    if (value.method === "cryptocurrency" && !value.transactionHash) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["transactionHash"],
-        message: "Enter the transaction hash.",
-      });
-    }
   });
 
 export const adminLoginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(200),
+});
+
+export const publicContactSchema = z.object({
+  email: z.string().trim().max(254).refine(
+    (value) => value === "" || z.string().email().safeParse(value).success,
+    "Enter a valid support email address.",
+  ),
+  phone: z.string().trim().max(40).refine(
+    (value) => value === "" || /^[+()0-9.\-\s]{6,40}$/.test(value),
+    "Enter a valid support phone number.",
+  ),
+}).refine((value) => value.email !== "" || value.phone !== "", {
+  message: "Provide a support email address, phone number, or both.",
 });
 
 export const registerSoldierSchema = z.object({

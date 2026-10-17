@@ -26,7 +26,6 @@ export async function POST(
       method: form.get("method"),
       paymentOptionId: form.get("paymentOptionId"),
       giftCardCode: form.get("giftCardCode") || undefined,
-      transactionHash: form.get("transactionHash") || undefined,
     });
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the payment details." }, { status: 400 });
@@ -49,18 +48,29 @@ export async function POST(
     const giftCiphertext = parsed.data.giftCardCode
       ? await encryptSensitiveValue(parsed.data.giftCardCode)
       : null;
-    const { data, error } = await service.rpc("submit_payment", {
+    const verificationCode = randomCode(20);
+    const verificationCodeCiphertext = await encryptSensitiveValue(verificationCode);
+    const legacyArguments = {
       p_donation_id: donationId,
       p_access_code: parsed.data.accessCode,
       p_method: parsed.data.method,
       p_payment_option_id: parsed.data.paymentOptionId,
       p_gift_code_ciphertext: giftCiphertext,
-      p_transaction_hash: parsed.data.transactionHash || null,
+      p_transaction_hash: null,
       p_evidence_path: uploadedPath,
       p_evidence_name: evidence.name.slice(0, 255),
       p_evidence_mime: evidence.type,
       p_evidence_size: evidence.size,
+    };
+    let result = await service.rpc("submit_payment", {
+      ...legacyArguments,
+      p_verification_code: verificationCode,
+      p_verification_code_ciphertext: verificationCodeCiphertext,
     });
+    if (result.error?.code === "PGRST202" && result.error.message.includes("submit_payment")) {
+      result = await service.rpc("submit_payment", legacyArguments);
+    }
+    const { data, error } = result;
     if (error) throw error;
     return NextResponse.json(data, { status: 201 });
   } catch (error) {

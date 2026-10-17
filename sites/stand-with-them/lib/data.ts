@@ -81,7 +81,7 @@ export async function getAdminSoldiers() {
 export async function getAdminPayments() {
   const { data, error } = await createServiceClient()
     .from("payment_submissions")
-    .select("id,method,status,submitted_at,transaction_hash,reviewed_at,decline_reason,payment_evidence(id,original_filename,mime_type,size_bytes),donations(id,reference,soldier_tag_snapshot,amount_minor,currency,support_categories(name),receipts(receipt_number))")
+    .select("id,method,status,submitted_at,transaction_hash,reviewed_at,decline_reason,payment_evidence(id,original_filename,mime_type,size_bytes),donations(id,reference,soldier_tag_snapshot,amount_minor,currency,support_categories(name),receipts(id))")
     .order("submitted_at", { ascending: false })
     .limit(200);
   if (error) throw error;
