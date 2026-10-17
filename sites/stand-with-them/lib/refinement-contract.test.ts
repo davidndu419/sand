@@ -52,6 +52,13 @@ describe("public refinement contract", () => {
     expect(receiptPdf).toContain('if (data.soldier_tag) rows.push(["Fulfilment status"');
   });
 
+  it("uses native Next.js build output on Vercel", () => {
+    const frameworkRunner = source("scripts/run-framework.mjs");
+    expect(frameworkRunner).toContain('process.env.VERCEL === "1"');
+    expect(frameworkRunner).toContain('node_modules/next/dist/bin/next');
+    expect(frameworkRunner).toContain('const vercelBuild');
+  });
+
   it("reveals encrypted verification codes only through an authorised admin endpoint", () => {
     const route = source("app/api/admin/receipts/[receiptId]/verification-code/route.ts");
     expect(route).toContain("authorizeAdmin()");
