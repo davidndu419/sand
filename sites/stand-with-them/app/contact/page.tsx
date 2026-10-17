@@ -1,0 +1,9 @@
+import { getPublicSetting } from "@/lib/data";
+
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Contact" };
+
+export default async function ContactPage() {
+  const email = await getPublicSetting<string | null>("contact.email", null);
+  return <main id="main-content"><section className="page-hero compact"><div className="shell page-hero-grid"><div><p className="eyebrow"><span /> CONTACT & SUPPORT</p><h1>How can we help?</h1></div><p>For payment reviews, declined submissions, receipt questions, or donation tracking, include only your receipt or donation reference. Never send a gift-card code in ordinary email.</p></div></section><section className="content-section"><div className="shell content-grid"><article className="content-prose"><h2>Support enquiries</h2>{email ? <p>Email <a href={`mailto:${email}`}>{email}</a>. Include your receipt number or donation reference, but do not include sensitive payment credentials.</p> : <p>The organisation’s public support email has not yet been configured. Administrators can publish it from Payment &amp; content settings. Receipt verification and donation tracking remain available through their dedicated pages.</p>}<h2>Safety guidance</h2><ul><li>Do not send soldier names, numbers, locations, units, or movements.</li><li>Do not email gift-card codes or unredacted payment evidence.</li><li>Use the private evidence upload during the donation flow.</li><li>Keep your verification and tracking codes in a secure place.</li></ul></article><aside><div className="sidebar-card"><h3>Self-service tools</h3><p>Check a receipt’s current payment status or review the events recorded for a donation.</p><p><a className="text-link" href="/verify-receipt">Verify receipt</a></p><p><a className="text-link" href="/track-donation">Track donation</a></p></div></aside></div></section></main>;
+}

@@ -1,0 +1,41 @@
+import { NextResponse } from "next/server";
+import { isSupabaseConfigured } from "@/lib/config";
+import { normalizeSoldierTag } from "@/lib/domain";
+import { enforceRateLimit, isSameOrigin, safeError } from "@/lib/security";
+import { createServiceClient } from "@/lib/supabase";
+import { startDonationSchema } from "@/lib/validation";
+
+export async function POST(request: Request) {
+  if (!isSameOrigin(request)) return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: "Donation submissions are temporarily unavailable." }, { status: 503 });
+  }
+  try {
+    const limited = await enforceRateLimit(request, "donation-start", 8, 600);
+    if (limited) return limited;
+    const parsed = startDonationSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the donation details." }, { status: 400 });
+    }
+    const input = parsed.data;
+    const service = createServiceClient();
+    const { data, error } = await service.rpc("create_donation_draft", {
+      p_kind: input.kind,
+      p_soldier_tag: input.soldierTag ? normalizeSoldierTag(input.soldierTag) : null,
+      p_category_slug: input.categorySlug,
+      p_amount_minor: input.amountMinor,
+      p_currency: input.currency,
+      p_donor_name: input.donorName || null,
+      p_donor_email: input.donorEmail || null,
+    });
+    if (error) {
+      if (error.message.includes("tag_unavailable")) {
+        return NextResponse.json({ error: "That soldier tag is inactive, ineligible, or unavailable." }, { status: 400 });
+      }
+      throw error;
+    }
+    return NextResponse.json(data, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
+  }
+}

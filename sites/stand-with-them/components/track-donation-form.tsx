@@ -1,0 +1,16 @@
+"use client";
+
+import { useState } from "react";
+import { Loader2, Route } from "lucide-react";
+import { formatMoney } from "@/lib/domain";
+import { StatusBadge } from "@/components/status-badge";
+
+type Tracked = { reference: string; soldierTag: string | null; categoryName: string; amountMinor: number; currency: string; paymentStatus: string; fulfilmentStatus: string; createdAt: string; events: Array<{ type: string; description: string; at: string }> };
+
+export function TrackDonationForm() {
+  const [reference, setReference] = useState(""); const [access, setAccess] = useState(""); const [loading, setLoading] = useState(false); const [result, setResult] = useState<Tracked | null | undefined>(); const [error, setError] = useState("");
+  async function track(event: React.FormEvent) { event.preventDefault(); setLoading(true); setError(""); setResult(undefined); try { const response = await fetch(`/api/donations/track?reference=${encodeURIComponent(reference)}&access=${encodeURIComponent(access)}`); const body = await response.json() as { error?: string; found?: boolean; donation?: Tracked }; if (!response.ok) throw new Error(body.error || "Tracking is temporarily unavailable."); setResult(body.found && body.donation ? body.donation : null); } catch (caught) { setError(caught instanceof Error ? caught.message : "Tracking failed."); } finally { setLoading(false); } }
+  return <><form className="form-card" onSubmit={track}><div className="form-grid"><div className="field"><label htmlFor="donation-reference">Donation reference</label><input id="donation-reference" value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} placeholder="DON-YYYYMMDD-XXXXXXXX" required /></div><div className="field"><label htmlFor="tracking-code">Private tracking code</label><input id="tracking-code" value={access} onChange={(event) => setAccess(event.target.value.toUpperCase())} placeholder="Code issued with your receipt" required /></div></div>{error && <div className="form-error">{error}</div>}<div className="form-actions"><button className="button button-navy" disabled={loading}>{loading ? <><Loader2 className="animate-spin" size={17} /> Looking up…</> : <><Route size={17} /> Track donation</>}</button></div></form>
+  {result === null && <div className="result-card danger"><h3>Donation not found</h3><p>Check both the donation reference and private tracking code. No private or operational information has been disclosed.</p></div>}
+  {result && <div className="result-card success"><h3>{result.reference}</h3><dl><div><dt>Beneficiary</dt><dd>{result.soldierTag || "General support"}</dd></div><div><dt>Category</dt><dd>{result.categoryName}</dd></div><div><dt>Amount</dt><dd>{formatMoney(result.amountMinor, result.currency)}</dd></div><div><dt>Payment</dt><dd><StatusBadge value={result.paymentStatus} /></dd></div><div><dt>Fulfilment</dt><dd><StatusBadge value={result.fulfilmentStatus} /></dd></div><div><dt>Recorded</dt><dd>{new Date(result.createdAt).toLocaleString()}</dd></div></dl><h3 style={{ marginTop: "2rem" }}>Recorded timeline</h3><ol className="timeline">{result.events.map((event, index) => <li key={`${event.at}-${index}`}><strong>{event.description}</strong><span>{new Date(event.at).toLocaleString()}</span></li>)}</ol></div>}</>;
+}
