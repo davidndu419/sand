@@ -107,7 +107,7 @@ export default async function Home() {
         <div className="shell context-grid">
           <div className="context-mark"><HandHeart size={42} /></div>
           <div><p className="eyebrow dark"><span /> HUMANITARIAN CONTEXT</p><h2>Human dignity remains the standard.</h2></div>
-          <div><p>International humanitarian law developed to limit suffering in armed conflict. The Geneva Conventions protect wounded and sick service members, prisoners, civilians, medical workers, and aid workers. Stand With Them is an independent support platform; it does not claim affiliation with the ICRC, United Nations, or any government.</p><a className="text-link" href="https://www.icrc.org/en/geneva-conventions-and-law" target="_blank" rel="noreferrer">Read the ICRC overview <ArrowRight size={16} /></a></div>
+          <div><p>International humanitarian law developed to limit suffering in armed conflict. The Geneva Conventions protect wounded and sick service members, prisoners, civilians, medical workers, and aid workers. Stand With Them is an independent support platform.</p><a className="text-link" href="https://www.icrc.org/en/geneva-conventions-and-law" target="_blank" rel="noreferrer">Read the ICRC overview <ArrowRight size={16} /></a></div>
         </div>
       </section>
 
