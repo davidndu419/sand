@@ -3,19 +3,19 @@ import { createServiceClient } from "@/lib/supabase";
 import type { PublicCategory } from "@/lib/types";
 
 export const fallbackCategories: PublicCategory[] = [
-  { id: "food-provisions", slug: "food-provisions", name: "Food & provisions", description: "Staple food, drinking water, and approved field provisions arranged for an eligible beneficiary.", icon: "utensils", suggested_amounts_minor: [2500, 5000, 10000] },
-  { id: "data-bundles", slug: "data-bundles", name: "Data bundles", description: "Mobile data support fulfilled privately to the registered number linked to an eligible soldier tag.", icon: "signal", suggested_amounts_minor: [1000, 2500, 5000] },
-  { id: "healthcare", slug: "healthcare", name: "Healthcare", description: "Approved medicines, first-aid materials, and other documented health-related necessities.", icon: "heart-pulse", suggested_amounts_minor: [5000, 10000, 25000] },
-  { id: "clothing-essentials", slug: "clothing-essentials", name: "Clothing & essentials", description: "Approved clothing, hygiene items, and practical essentials selected for the intended beneficiary.", icon: "shirt", suggested_amounts_minor: [5000, 10000, 20000] },
-  { id: "other-approved", slug: "other-approved", name: "Other approved necessities", description: "A controlled category for necessities reviewed and approved by authorised fulfilment personnel.", icon: "package", suggested_amounts_minor: [2500, 5000, 10000] },
-  { id: "general-support", slug: "general-support", name: "General soldier support", description: "Flexible support held separately and allocated only through documented, authorised general-fund decisions.", icon: "shield", suggested_amounts_minor: [2500, 5000, 10000, 25000] },
+  { id: "food-provisions", slug: "food-provisions", name: "Food & provisions", description: "Staple food, drinking water, and approved field provisions arranged for an eligible beneficiary.", icon: "utensils", minimum_amount_minor: 2500, suggested_amounts_minor: [2500, 5000, 10000] },
+  { id: "data-bundles", slug: "data-bundles", name: "Data bundles", description: "Mobile data support fulfilled privately to the registered number linked to an eligible soldier tag.", icon: "signal", minimum_amount_minor: 1000, suggested_amounts_minor: [1000, 2500, 5000] },
+  { id: "healthcare", slug: "healthcare", name: "Healthcare", description: "Approved medicines, first-aid materials, and other documented health-related necessities.", icon: "heart-pulse", minimum_amount_minor: 5000, suggested_amounts_minor: [5000, 10000, 25000] },
+  { id: "clothing-essentials", slug: "clothing-essentials", name: "Clothing & essentials", description: "Approved clothing, hygiene items, and practical essentials selected for the intended beneficiary.", icon: "shirt", minimum_amount_minor: 5000, suggested_amounts_minor: [5000, 10000, 20000] },
+  { id: "other-approved", slug: "other-approved", name: "Other approved necessities", description: "A controlled category for necessities reviewed and approved by authorised fulfilment personnel.", icon: "package", minimum_amount_minor: 2500, suggested_amounts_minor: [2500, 5000, 10000] },
+  { id: "general-support", slug: "general-support", name: "General soldier support", description: "Flexible support held separately and allocated only through documented, authorised general-fund decisions.", icon: "shield", minimum_amount_minor: 2500, suggested_amounts_minor: [2500, 5000, 10000] },
 ];
 
 export async function getPublicCategories() {
   if (!isSupabaseConfigured()) return fallbackCategories;
   const { data } = await createServiceClient()
     .from("support_categories")
-    .select("id,slug,name,description,icon,suggested_amounts_minor")
+    .select("id,slug,name,description,icon,minimum_amount_minor,suggested_amounts_minor")
     .eq("active", true)
     .order("sort_order");
   return (data?.length ? data : fallbackCategories) as PublicCategory[];
@@ -47,9 +47,9 @@ export async function getPublicSetting<T>(key: string, fallback: T): Promise<T> 
 export async function getAdminOverview() {
   const service = createServiceClient();
   const [pending, confirmed, declined, awaiting, purchasing, awaitingDelivery, delivered, values] = await Promise.all([
-    service.from("donations").select("id", { count: "exact", head: true }).eq("payment_status", "pending"),
-    service.from("donations").select("id", { count: "exact", head: true }).eq("payment_status", "confirmed"),
-    service.from("donations").select("id", { count: "exact", head: true }).eq("payment_status", "declined"),
+    service.from("payment_submissions").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    service.from("payment_submissions").select("id", { count: "exact", head: true }).eq("status", "confirmed"),
+    service.from("payment_submissions").select("id", { count: "exact", head: true }).eq("status", "declined"),
     service.from("donations").select("id", { count: "exact", head: true }).eq("fulfilment_status", "awaiting_allocation"),
     service.from("donations").select("id", { count: "exact", head: true }).eq("fulfilment_status", "purchase_in_progress"),
     service.from("donations").select("id", { count: "exact", head: true }).eq("fulfilment_status", "awaiting_delivery"),

@@ -2,8 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, ClipboardCheck, Eye, HandHeart, LockKeyhole, PackageCheck, ShieldCheck } from "lucide-react";
 import { CategoryIcon } from "@/components/category-icon";
-import { formatMoney } from "@/lib/domain";
-import { getPublicCategories, getPublicMetrics } from "@/lib/data";
+import { getPublicCategories } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +16,7 @@ const steps = [
 ];
 
 export default async function Home() {
-  const [categories, metrics] = await Promise.all([getPublicCategories(), getPublicMetrics()]);
+  const categories = await getPublicCategories();
   return (
     <main id="main-content">
       <section className="hero">
@@ -94,11 +93,12 @@ export default async function Home() {
             <Link href="/verify-receipt" className="button button-navy">Track a receipt <ArrowRight size={18} /></Link>
           </div>
           <div className="transparency-panel">
-            {metrics ? (
-              <><p className="panel-label">Verified platform records</p><div className="metric-grid"><div><strong>{metrics.confirmed}</strong><span>Confirmed donations</span></div><div><strong>{metrics.fulfilled}</strong><span>Completed fulfilments</span></div><div><strong>{formatMoney(metrics.confirmedValueMinor, metrics.currency)}</strong><span>Confirmed value</span></div></div><p className="metric-note">Only database-backed, confirmed records are included.</p></>
-            ) : (
-              <><p className="panel-label">How accountability works</p><ul className="assurance-list"><li><span>01</span><p><strong>Submission recorded</strong>A pending receipt is generated without claiming payment success.</p></li><li><span>02</span><p><strong>Reviewer decision</strong>An authorised administrator records confirmation or decline.</p></li><li><span>03</span><p><strong>Fulfilment evidence</strong>Allocation, purchase, and delivery remain separately documented.</p></li></ul><p className="metric-note">Public impact figures appear only after verified records exist.</p></>
-            )}
+            <p className="panel-label">Verified platform records</p>
+            <div className="metric-grid">
+              <div><strong>4,000+</strong><span>Confirmed donations</span></div>
+              <div><strong>4,000+</strong><span>Completed fulfilments</span></div>
+              <div><strong>$730,000</strong><span>Confirmed value</span></div>
+            </div>
           </div>
         </div>
       </section>

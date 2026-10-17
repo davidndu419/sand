@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation";
 import { formatMoney, normalizeSoldierTag } from "@/lib/domain";
 import type { PublicCategory } from "@/lib/types";
 
+function availableAmounts(category?: PublicCategory) {
+  if (!category) return [100];
+  const amounts = category.suggested_amounts_minor.filter((amount) => amount >= category.minimum_amount_minor);
+  return amounts.length ? amounts : [category.minimum_amount_minor];
+}
+
 export function DonationForm({
   kind,
   categories,
@@ -31,17 +37,19 @@ export function DonationForm({
   const [tag, setTag] = useState("");
   const [tagValid, setTagValid] = useState(kind === "general");
   const [checkingTag, setCheckingTag] = useState(false);
-  const [amountMinor, setAmountMinor] = useState(category?.suggested_amounts_minor[0] ?? 2500);
+  const [amountMinor, setAmountMinor] = useState(availableAmounts(category)[0]);
   const [customAmount, setCustomAmount] = useState("");
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const minimumAmountMinor = category?.minimum_amount_minor ?? 100;
+  const suggestedAmounts = useMemo(() => availableAmounts(category), [category]);
 
   function changeCategory(value: string) {
     setCategorySlug(value);
     const next = usableCategories.find((item) => item.slug === value);
-    setAmountMinor(next?.suggested_amounts_minor[0] ?? 2500);
+    setAmountMinor(availableAmounts(next)[0]);
     setCustomAmount("");
     if (kind === "soldier") setTagValid(false);
   }
@@ -75,8 +83,8 @@ export function DonationForm({
       setError("Validate the soldier tag for the selected category before continuing.");
       return;
     }
-    if (!Number.isInteger(finalAmount) || finalAmount < 100) {
-      setError("Enter an amount of at least $1.00.");
+    if (!Number.isInteger(finalAmount) || finalAmount < minimumAmountMinor) {
+      setError(`Enter an amount of at least ${formatMoney(minimumAmountMinor)}.`);
       return;
     }
     setSubmitting(true);
@@ -133,7 +141,7 @@ export function DonationForm({
         <fieldset className="field field-full">
           <legend className="field-label">Choose an amount (USD)</legend>
           <div className="amount-grid">
-            {category?.suggested_amounts_minor.map((amount) => (
+            {suggestedAmounts.map((amount) => (
               <div className="amount-option" key={amount}>
                 <input id={`amount-${amount}`} name="amount" type="radio" checked={!customAmount && amountMinor === amount} onChange={() => { setAmountMinor(amount); setCustomAmount(""); }} />
                 <label htmlFor={`amount-${amount}`}>{formatMoney(amount)}</label>
@@ -143,7 +151,8 @@ export function DonationForm({
         </fieldset>
         <div className="field field-full">
           <label htmlFor="custom-amount">Or enter a custom amount (USD)</label>
-          <input id="custom-amount" type="number" min="1" max="1000000" step="0.01" value={customAmount} onChange={(event) => setCustomAmount(event.target.value)} placeholder="0.00" />
+          <input id="custom-amount" type="number" min={(minimumAmountMinor / 100).toFixed(2)} max="1000000" step="0.01" value={customAmount} onChange={(event) => setCustomAmount(event.target.value)} placeholder={(minimumAmountMinor / 100).toFixed(2)} />
+          <small>Minimum donation for this category: {formatMoney(minimumAmountMinor)}.</small>
         </div>
         <div className="field"><label htmlFor="donor-name">Name (optional)</label><input id="donor-name" value={donorName} onChange={(event) => setDonorName(event.target.value)} maxLength={100} autoComplete="name" /></div>
         <div className="field"><label htmlFor="donor-email">Email (optional)</label><input id="donor-email" type="email" value={donorEmail} onChange={(event) => setDonorEmail(event.target.value)} maxLength={254} autoComplete="email" /></div>

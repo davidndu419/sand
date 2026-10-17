@@ -32,6 +32,11 @@ const editableContactMigration = readFileSync(
   "utf8",
 ).toLowerCase();
 
+const categoryMinimumMigration = readFileSync(
+  join(process.cwd(), "supabase", "migrations", "202610170007_category_minimum_amounts.sql"),
+  "utf8",
+).toLowerCase();
+
 const requiredTables = [
   "admin_profiles", "support_categories", "soldiers", "donations",
   "payment_submissions", "payment_evidence", "receipts", "fund_allocations",
@@ -152,6 +157,14 @@ describe("database security contract", () => {
   it("prevents recorded purchase costs from exceeding allocated funds", () => {
     expect(migration).toContain("v_spent+p_actual_cost_minor > v_allocated");
     expect(migration).toContain("raise exception 'cost_exceeds_allocation'");
+  });
+
+  it("enforces category minimums and seeds only the supported gift cards", () => {
+    expect(categoryMinimumMigration).toContain("minimum_amount_minor");
+    expect(categoryMinimumMigration).toContain("amount_below_category_minimum");
+    expect(categoryMinimumMigration).toContain("'apple'");
+    expect(categoryMinimumMigration).toContain("'razer'");
+    expect(categoryMinimumMigration).toContain("'xbox'");
   });
 
   it("limits public receipt verification to an explicit field projection", () => {

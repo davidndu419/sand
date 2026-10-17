@@ -314,6 +314,17 @@ h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; letter-spacing: -.0
 .table-actions { display: flex; gap: .4rem; flex-wrap: wrap; }
 .table-button { border: 1px solid #aeb9ba; background: white; color: var(--navy); padding: .38rem .55rem; font-size: .7rem; font-weight: 800; cursor: pointer; }
 .table-button.danger { color: var(--danger); border-color: #d6aaa6; }
+.category-amount-table { min-width: 820px; }
+.category-amount-control { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .55rem; min-width: 18rem; max-width: 22rem; }
+.category-amount-control > label { display: grid; gap: .25rem; color: var(--muted); font-size: .62rem; font-weight: 800; }
+.category-amount-input { display: flex; align-items: center; gap: .3rem; }
+.category-amount-input b { color: var(--muted); }
+.category-amount-input input { width: 100%; min-width: 0; min-height: 34px; border: 1px solid #aeb9ba; padding: .35rem .45rem; color: var(--ink); background: white; }
+.category-amount-control > .table-button { grid-column: 1 / -1; width: fit-content; }
+.payment-option-edit-row td { background: #f7f8f5; padding: 1rem; }
+.payment-option-edit { min-width: 620px; }
+.payment-option-edit textarea { min-height: 100px; }
+.payment-option-edit .form-actions { margin-top: .8rem; }
 .admin-code-action { display: grid; gap: .35rem; min-width: 9rem; }
 .admin-code-action .table-button { display: inline-flex; align-items: center; justify-content: center; gap: .3rem; width: fit-content; }
 .admin-code-error { color: var(--danger); max-width: 13rem; line-height: 1.35; }

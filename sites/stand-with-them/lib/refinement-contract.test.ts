@@ -80,6 +80,44 @@ describe("public refinement contract", () => {
     expect(settings).toContain("/api/admin/settings/contact");
     expect(settings).toContain("Support phone number");
   });
+
+  it("lets administrators edit public payment instructions and cryptocurrency wallet addresses", () => {
+    const settings = source("components/admin/settings-manager.tsx");
+    const route = source("app/api/admin/payment-options/[optionId]/route.ts");
+    const paymentForm = source("components/payment-form.tsx");
+    expect(settings).toContain("savePaymentOption");
+    expect(settings).toContain("Public payment instructions");
+    expect(settings).toContain("walletAddress");
+    expect(route).toContain("wallet_address");
+    expect(route).toContain('.select("id,method,label,instructions,active,config")');
+    expect(paymentForm).toContain("<p>{option.instructions}</p>");
+  });
+
+  it("lets administrators edit all three donor amount choices per category", () => {
+    const settingsPage = source("app/admin/(protected)/settings/page.tsx");
+    const settings = source("components/admin/settings-manager.tsx");
+    const categoryRoute = source("app/api/admin/categories/[categoryId]/route.ts");
+    expect(settingsPage).toContain("suggested_amounts_minor");
+    expect(settings).toContain("Donation amounts (USD)");
+    expect(settings).toContain("[0, 1, 2].map");
+    expect(settings).toContain("suggestedAmountsMinor");
+    expect(categoryRoute).toContain("suggested_amounts_minor");
+    expect(categoryRoute).toContain(".length(3)");
+  });
+
+  it("does not count unfinished donation drafts as pending payments", () => {
+    const data = source("lib/data.ts");
+    const donationsPage = source("app/admin/(protected)/donations/page.tsx");
+    const generalFundPage = source("app/admin/(protected)/general-fund/page.tsx");
+    const draftMigration = source("supabase/migrations/202610170012_activate_donation_on_payment_submission.sql");
+    expect(data).toContain('service.from("payment_submissions").select("id", { count: "exact", head: true }).eq("status", "pending")');
+    expect(donationsPage).toContain("payment_submissions!inner(method)");
+    expect(donationsPage).toContain("receipts!inner(id)");
+    expect(generalFundPage).toContain("payment_submissions!inner(id)");
+    expect(draftMigration).toContain("alter column payment_status set default 'draft'");
+    expect(draftMigration).toContain("and not exists (");
+    expect(draftMigration).toContain("set payment_status='pending'");
+  });
 });
 
 describe("administrator protection contract", () => {

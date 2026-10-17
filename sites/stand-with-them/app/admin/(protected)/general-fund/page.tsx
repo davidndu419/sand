@@ -10,7 +10,7 @@ export default async function GeneralFundPage() {
   await requireAdmin("manage_fulfilment");
   const service = createServiceClient();
   const [{ data: donations }, { data: transactions }] = await Promise.all([
-    service.from("donations").select("id,reference,amount_minor,currency,payment_status,fulfilment_status,created_at,support_categories(name)").eq("kind", "general").order("created_at", { ascending: false }),
+    service.from("donations").select("id,reference,amount_minor,currency,payment_status,fulfilment_status,created_at,support_categories(name),payment_submissions!inner(id),receipts!inner(id)").eq("kind", "general").order("created_at", { ascending: false }),
     service.from("general_fund_transactions").select("id,transaction_type,amount_minor,description,recorded_at").order("recorded_at", { ascending: false }),
   ]);
   const contributions = (transactions ?? []).filter((item) => item.transaction_type === "contribution").reduce((sum, item) => sum + Number(item.amount_minor), 0);

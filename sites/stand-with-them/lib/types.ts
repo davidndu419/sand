@@ -30,6 +30,7 @@ export type PublicCategory = {
   name: string;
   description: string;
   icon: string;
+  minimum_amount_minor: number;
   suggested_amounts_minor: number[];
 };
 

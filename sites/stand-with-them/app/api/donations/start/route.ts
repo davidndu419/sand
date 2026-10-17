@@ -19,6 +19,16 @@ export async function POST(request: Request) {
     }
     const input = parsed.data;
     const service = createServiceClient();
+    const { data: category } = await service
+      .from("support_categories")
+      .select("minimum_amount_minor")
+      .eq("slug", input.categorySlug)
+      .eq("active", true)
+      .maybeSingle();
+    const minimumAmountMinor = Number(category?.minimum_amount_minor ?? 100);
+    if (input.amountMinor < minimumAmountMinor) {
+      return NextResponse.json({ error: `The minimum donation for this category is $${(minimumAmountMinor / 100).toFixed(2)}.` }, { status: 400 });
+    }
     const rpcArguments = {
       p_kind: input.kind,
       p_soldier_tag: input.soldierTag ? normalizeSoldierTag(input.soldierTag) : null,
@@ -42,6 +52,9 @@ export async function POST(request: Request) {
     if (error) {
       if (error.message.includes("tag_unavailable")) {
         return NextResponse.json({ error: "That soldier tag is inactive, ineligible, or unavailable." }, { status: 400 });
+      }
+      if (error.message.includes("amount_below_category_minimum")) {
+        return NextResponse.json({ error: "The amount is below the minimum donation for this category." }, { status: 400 });
       }
       throw error;
     }

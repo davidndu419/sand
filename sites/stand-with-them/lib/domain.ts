@@ -25,6 +25,7 @@ export function formatMoney(amountMinor: number, currency = "USD") {
 }
 
 const statusLabels: Record<string, string> = {
+  draft: "Payment Not Submitted",
   pending: "Pending Verification",
   confirmed: "Confirmed",
   declined: "Declined",
